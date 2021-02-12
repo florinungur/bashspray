@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # This file is part of the Resilient Cloud Native Infrastructure Testing (RCNIT) graduation thesis.
 
@@ -7,10 +7,10 @@ RED='\033[0;31m'
 END='\033[0m'
 
 # Declaring VM names
-machines=( "node1" "node2" "node3" "node4" )
+machines=("node1" "node2" "node3" "node4")
 
 for i in "${machines[@]}"; do
-	sudo virsh start "$i"
+    sudo virsh destroy "$i"
 done
-sleep 20
-echo -e "${GREEN}VMs started!${END}"
+sleep 3
+echo -e "${RED}VMs killed!${END}"

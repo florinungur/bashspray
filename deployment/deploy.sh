@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # This file is part of the Resilient Cloud Native Infrastructure Testing (RCNIT) graduation thesis.
 
@@ -7,7 +7,7 @@ RED='\033[0;31m'
 END='\033[0m'
 
 # Declaring VM names & IPs
-machines=( "node1" "node2" "node3" "node4" )
+machines=("node1" "node2" "node3" "node4")
 declare -a ips
 
 echo -e "${RED}Creating RCNIT folder structure...${END}"
@@ -30,63 +30,63 @@ echo -e "${RED}CentOS 7 downloaded!${END}"
 # http://atodorov.org/blog/2015/12/16/virtio-vs-rtl8139/
 # https://earlruby.org/2018/12/use-iso-and-kickstart-files-to-automatically-create-vms/
 for i in "${machines[@]}"; do
-	echo -e
-	echo -e "${RED}Creating $i...${END}"
-	sudo virt-install \
-	--name "$i" \
-	--virt-type kvm \
-	--ram=4096 \
-	--vcpus=2 \
-	--os-type=Linux \
-	--os-variant=centos7.0 \
-	--disk path="$HOME"/2020_RCNIT/VMs/"$i".qcow2,bus=virtio,size=20 \
-	--graphics spice \
-	--location ~/2020_RCNIT/ISOs/CentOS-7-x86_64-Minimal-1908.iso \
-	--network network=default,model=rtl8139 \
-	--noreboot \
-	--initrd-inject=kickstart.ks \
-	--extra-args "ks=file:/kickstart.ks"
+    echo -e
+    echo -e "${RED}Creating $i...${END}"
+    sudo virt-install \
+        --name "$i" \
+        --virt-type kvm \
+        --ram=4096 \
+        --vcpus=2 \
+        --os-type=Linux \
+        --os-variant=centos7.0 \
+        --disk path="$HOME"/2020_RCNIT/VMs/"$i".qcow2,bus=virtio,size=20 \
+        --graphics spice \
+        --location ~/2020_RCNIT/ISOs/CentOS-7-x86_64-Minimal-1908.iso \
+        --network network=default,model=rtl8139 \
+        --noreboot \
+        --initrd-inject=kickstart.ks \
+        --extra-args "ks=file:/kickstart.ks"
 done
 echo -e "${RED}VMs created!${END}"
 
 echo -e "${RED}Creating fresh-install snapshots...${END}"
 for i in "${machines[@]}"; do
-	sudo virsh snapshot-create-as --domain "$i" \
-	--name "fresh-install" \
-	--description "Fresh CentOS 7 installation"
+    sudo virsh snapshot-create-as --domain "$i" \
+        --name "fresh-install" \
+        --description "Fresh CentOS 7 installation"
 done
 echo -e "${RED}Snapshots created!${END}"
 
-~/2020_RCNIT/Scripts/Maintenance/./start-machines.sh
+~/2020_RCNIT/Scripts/maintenance/./start-machines.sh
 
 echo -e "${RED}Configuring SSH...${END}"
 ssh-keygen -f ~/.ssh/rcnit_key -N "" <<<n
 for i in "${machines[@]}"; do
-	# This allows connecting to machines through ssh using the command 'ssh <hostname>'
-	echo "Host $i" | tee -a "${HOME}/.ssh/config"
-	echo "	Hostname " | tr -d '\n' | tee -a "${HOME}/.ssh/config" && sudo virsh domifaddr "$i" | awk 'FNR==3 {print $4}' | rev | cut -c4- | rev | tee -a "${HOME}/.ssh/config"
-	echo "	IdentityFile ~/.ssh/rcnit_key" | tee -a "${HOME}/.ssh/config"
-	echo "	User bashful" | tee -a "${HOME}/.ssh/config"
-	# sshpass uses the local super user password
-	# https://unix.stackexchange.com/questions/230084/send-the-password-through-stdin-in-ssh-copy-id
-	sshpass -p "bashful" ssh-copy-id -o StrictHostKeyChecking=no -i ~/.ssh/rcnit_key "$i"
-	ssh -o StrictHostKeyChecking=no "$i" "chmod 700 .ssh; chmod 640 .ssh/authorized_keys"
-	# Put all IPs into array; used by 'CONFIG_FILE' for configuring kubespray's hosts.yml
-	ips+=( "$(sudo virsh domifaddr "$i" | awk 'FNR==3 {print $4}' | rev | cut -c4- | rev)" )
+    # This allows connecting to machines through ssh using the command 'ssh <hostname>'
+    echo "Host $i" | tee -a "${HOME}/.ssh/config"
+    echo "	Hostname " | tr -d '\n' | tee -a "${HOME}/.ssh/config" && sudo virsh domifaddr "$i" | awk 'FNR==3 {print $4}' | rev | cut -c4- | rev | tee -a "${HOME}/.ssh/config"
+    echo "	IdentityFile ~/.ssh/rcnit_key" | tee -a "${HOME}/.ssh/config"
+    echo "	User bashful" | tee -a "${HOME}/.ssh/config"
+    # sshpass uses the local super user password
+    # https://unix.stackexchange.com/questions/230084/send-the-password-through-stdin-in-ssh-copy-id
+    sshpass -p "bashful" ssh-copy-id -o StrictHostKeyChecking=no -i ~/.ssh/rcnit_key "$i"
+    ssh -o StrictHostKeyChecking=no "$i" "chmod 700 .ssh; chmod 640 .ssh/authorized_keys"
+    # Put all IPs into array; used by 'CONFIG_FILE' for configuring kubespray's hosts.yml
+    ips+=("$(sudo virsh domifaddr "$i" | awk 'FNR==3 {print $4}' | rev | cut -c4- | rev)")
 done
 # Copying the SSH key allows passwordless login between VMs; necessary for kubespray
 # Copying the config & known_hosts files allows for 'ssh <hostname>' login without host key checking
 for i in "${machines[@]}"; do
-	scp ~/.ssh/config "$i":.ssh/
-	scp ~/.ssh/known_hosts "$i":.ssh/
-	scp ~/.ssh/rcnit_key "$i":.ssh/
-	scp ~/.ssh/rcnit_key.pub "$i":.ssh/
+    scp ~/.ssh/config "$i":.ssh/
+    scp ~/.ssh/known_hosts "$i":.ssh/
+    scp ~/.ssh/rcnit_key "$i":.ssh/
+    scp ~/.ssh/rcnit_key.pub "$i":.ssh/
 done
 echo -e "${RED}SSH configured!${END}"
 
 echo -e "${RED}Configuring VMs...${END}"
 for i in "${machines[@]}"; do
-	ssh -tt "$i" 'echo "bashful" | sudo -Sv && bash -s' << EOF
+    ssh -tt "$i" 'echo "bashful" | sudo -Sv && bash -s' <<EOF
 	echo "Downloading necessary software"
 	sudo yum update -y
 	sudo yum install -y python-netaddr python36 python3-pip python-setuptools git wget epel-release
@@ -110,9 +110,9 @@ EOF
 done
 echo -e "${RED}VMs configured!${END}"
 
-~/2020_RCNIT/Scripts/Maintenance/./stop-machines.sh
-~/2020_RCNIT/Scripts/Maintenance/./kill-machines.sh
-~/2020_RCNIT/Scripts/Maintenance/./start-machines.sh
+~/2020_RCNIT/Scripts/maintenance/./stop-machines.sh
+~/2020_RCNIT/Scripts/maintenance/./kill-machines.sh
+~/2020_RCNIT/Scripts/maintenance/./start-machines.sh
 
 echo -e "${RED}Configuring kubespray...${END}"
 cd ~/2020_RCNIT/ || exit
@@ -132,9 +132,9 @@ echo -e "${RED}Deploying Kubernetes...${END}"
 # https://www.youtube.com/watch?v=CJ5G4GpqDy0
 ansible-playbook -i ~/2020_RCNIT/kubespray/inventory/rcnit/hosts.yml ~/2020_RCNIT/kubespray/cluster.yml --become --become-user=root
 # Installing kubectl on localhost
-sudo curl -LO https://storage.googleapis.com/kubernetes-release/release/`curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt`/bin/linux/amd64/kubectl
+sudo curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
 # Giving the first master kubectl access
-ssh -tt node1 'echo "bashful" | sudo -Sv && bash -s' << EOF
+ssh -tt node1 'echo "bashful" | sudo -Sv && bash -s' <<EOF
 	mkdir ~/.kube
 	sudo cp --verbose /etc/kubernetes/admin.conf ~/.kube/
 	cd ~/.kube
@@ -147,18 +147,18 @@ scp node1:~/.kube/config ~/2020_RCNIT/
 mkdir ~/.kube
 mv ~/2020_RCNIT/config ~/.kube/
 # https://stackoverflow.com/questions/48228534/kubernetes-dashboard-access-using-config-file-not-enough-data-to-create-auth-inf
-TOKEN=$(kubectl -n kube-system describe secret default| awk '$1=="token:"{print $2}')
+TOKEN=$(kubectl -n kube-system describe secret default | awk '$1=="token:"{print $2}')
 kubectl config set-credentials kubernetes-admin --token="${TOKEN}"
-~/2020_RCNIT/Scripts/Maintenance/./stop-machines.sh
-~/2020_RCNIT/Scripts/Maintenance/./kill-machines.sh
+~/2020_RCNIT/Scripts/maintenance/./stop-machines.sh
+~/2020_RCNIT/Scripts/maintenance/./kill-machines.sh
 echo -e "${RED}Kubernetes deployed!${END}"
 
 echo -e "${RED}Creating fresh-kubernetes snapshots...${END}"
 for i in "${machines[@]}"; do
-	sudo virsh snapshot-create-as --domain "$i" \
-	--name "fresh-kubernetes" \
-	--description "Fresh Kubernetes installation"
+    sudo virsh snapshot-create-as --domain "$i" \
+        --name "fresh-kubernetes" \
+        --description "Fresh Kubernetes installation"
 done
 echo -e "${RED}Snapshots created!${END}"
 
-~/2020_RCNIT/Scripts/Maintenance/./start-machines.sh
+~/2020_RCNIT/Scripts/maintenance/./start-machines.sh
